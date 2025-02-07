@@ -1,17 +1,11 @@
 import {
   ChatCompletionChunk,
-  ChatCompletionRequest,
-  ChatCompletionResponse,
-  ChatMessageOptions,
   Message,
   SimpleChatRequest,
 } from '../types/deepseek.types';
-import {
-  ChatCompletionCreateParamsBase,
-  ChatCompletionCreateParamsNonStreaming,
-} from 'openai/resources/chat/completions';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 
+import { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { DeepseekConfig } from '../config/deepseek.config';
 import OpenAI from 'openai';
 import axios from 'axios';
@@ -21,7 +15,6 @@ export class DeepseekService {
   private readonly apiKey: string;
   private readonly baseURL: string;
   private readonly openai: OpenAI;
-  private readonly historyMessage: Message[] = [];
 
   constructor() {
     this.apiKey = process.env.DEEPSEEK_API_KEY!;
@@ -45,19 +38,8 @@ export class DeepseekService {
   private createChatRequest(
     request: SimpleChatRequest,
   ): ChatCompletionCreateParamsNonStreaming {
-    const { isCache } = request;
-    if (isCache) {
-      this.historyMessage.push({
-        role: 'user',
-        content: request.message,
-      });
-    }
-
     return {
-      messages: [
-        ...this.historyMessage,
-        { role: 'user', content: request.message },
-      ],
+      messages: request.messages,
       model: DeepseekConfig.defaultModel,
       temperature: DeepseekConfig.defaultTemperature,
       max_tokens: DeepseekConfig.defaultMaxTokens,

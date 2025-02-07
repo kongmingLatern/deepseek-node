@@ -8,8 +8,7 @@ export interface ChatMessageOptions {
 }
 
 export interface SimpleChatRequest {
-  message: string;
-  isCache: boolean;
+  messages: ChatMessage[];
 }
 
 export interface Message {
