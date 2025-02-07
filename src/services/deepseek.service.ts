@@ -3,7 +3,9 @@ import {
   Message,
   SimpleChatRequest,
 } from '../types/deepseek.types';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 
 import { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { DeepseekConfig } from '../config/deepseek.config';
@@ -12,25 +14,27 @@ import axios from 'axios';
 
 @Injectable()
 export class DeepseekService {
-  private readonly apiKey: string;
-  private readonly baseURL: string;
-  private readonly openai: OpenAI;
+  private baseURL: string;
+  private openai: OpenAI;
 
-  constructor() {
-    this.apiKey = process.env.DEEPSEEK_API_KEY!;
+  constructor(@Inject(REQUEST) private readonly request: Request) {
     this.baseURL = DeepseekConfig.baseURL;
+    const apiKey = this.request.headers['x-api-key'] as string;
+
+    if (!apiKey) {
+      throw new Error('Deepseek API key is not provided in request header');
+    }
+
     this.openai = new OpenAI({
       baseURL: this.baseURL,
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
-    if (!this.apiKey) {
-      throw new Error('Deepseek API key is not configured');
-    }
   }
 
   private getHeaders() {
+    const apiKey = this.request.headers['x-api-key'] as string;
     return {
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     };
   }
@@ -71,39 +75,21 @@ export class DeepseekService {
   ) {
     try {
       const chatRequest = this.createChatRequest(request);
-      const response = await axios.post(
-        `${this.baseURL}/chat/completions`,
-        {
-          ...chatRequest,
-          stream: true,
-        },
-        {
-          headers: this.getHeaders(),
-          responseType: 'stream',
-        },
-      );
-
-      response.data.on('data', (chunk: Buffer) => {
-        const lines = chunk
-          .toString()
-          .split('\n')
-          .filter((line) => line.trim() !== '');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') return;
-            try {
-              const parsed = JSON.parse(data) as ChatCompletionChunk;
-              onChunk(parsed);
-            } catch (e) {
-              console.error('Failed to parse SSE chunk:', e);
-            }
-          }
-        }
+      const stream = await this.openai.chat.completions.create({
+        ...chatRequest,
+        stream: true,
       });
 
-      return response.data;
+      // 处理流式响应
+      for await (const chunk of stream) {
+        try {
+          onChunk(chunk as ChatCompletionChunk);
+        } catch (e) {
+          console.error('处理流式数据块失败:', e);
+        }
+      }
+
+      return stream;
     } catch (error) {
       throw new HttpException(
         error.response?.data?.error ||
