@@ -11,6 +11,10 @@ export interface SimpleChatRequest {
   messages: ChatMessage[];
 }
 
+export interface StreamChatRequest {
+  messages: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;

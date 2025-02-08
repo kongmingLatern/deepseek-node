@@ -1,7 +1,9 @@
 import {
   ChatCompletionChunk,
+  ChatMessage,
   Message,
   SimpleChatRequest,
+  StreamChatRequest,
 } from '../types/deepseek.types';
 import { HttpException, HttpStatus, Injectable, Inject } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
@@ -70,26 +72,32 @@ export class DeepseekService {
   }
 
   async chatStream(
-    request: SimpleChatRequest,
+    request: StreamChatRequest,
     onChunk: (chunk: ChatCompletionChunk) => void,
   ) {
     try {
-      const chatRequest = this.createChatRequest(request);
-      const stream = await this.openai.chat.completions.create({
-        ...chatRequest,
-        stream: true,
-      });
-
-      // 处理流式响应
-      for await (const chunk of stream) {
-        try {
-          onChunk(chunk as ChatCompletionChunk);
-        } catch (e) {
-          console.error('处理流式数据块失败:', e);
+      const { messages } = request;
+      if (messages) {
+        const chatRequest = this.createChatRequest({
+          messages: JSON.parse(messages) as ChatMessage[],
+        });
+        const stream = await this.openai.chat.completions.create({
+          ...chatRequest,
+          stream: true,
+        });
+        // mock一下stream,用mock
+        // 处理流式响应
+        for await (const chunk of stream) {
+          try {
+            onChunk(chunk as ChatCompletionChunk);
+          } catch (e) {
+            console.error('处理流式数据块失败:', e);
+          }
         }
-      }
 
-      return stream;
+        return stream;
+      }
+      throw new Error('messages is required');
     } catch (error) {
       throw new HttpException(
         error.response?.data?.error ||

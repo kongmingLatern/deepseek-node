@@ -1,7 +1,15 @@
-import { Body, Controller, Post, Res, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Res,
+  HttpStatus,
+  Get,
+  Query,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { DeepseekService } from '../services/deepseek.service';
-import { SimpleChatRequest } from '../types/deepseek.types';
+import { SimpleChatRequest, StreamChatRequest } from '../types/deepseek.types';
 
 @Controller('api/deepseek')
 export class DeepseekController {
@@ -12,9 +20,9 @@ export class DeepseekController {
     return await this.deepseekService.chat(request);
   }
 
-  @Post('chat/stream')
+  @Get('chat/stream')
   async chatStream(
-    @Body() request: SimpleChatRequest,
+    @Query() request: StreamChatRequest,
     @Res() response: Response,
   ) {
     response.setHeader('Content-Type', 'text/event-stream');
